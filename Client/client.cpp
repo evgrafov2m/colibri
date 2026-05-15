@@ -1,17 +1,14 @@
 #include "client.h"
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QDateTime>
-#include <QCoreApplication>
-#include <QTextStream>
-#include <QDebug>
-#include <QRandomGenerator>
+
 #include <QDataStream>
+#include <QDebug>
+#include <QJsonDocument>
+#include <QRandomGenerator>
 
 Client::Client(QObject *parent) : QObject(parent)
 {
-  static constexpr int rInterval = 1000 * 5; // 5sec интервал переподключения
-  recTimer_.setInterval(rInterval);
+  static constexpr auto reconnectIntervalMs = 1000 * 5;
+  recTimer_.setInterval(reconnectIntervalMs);
   sendTimer_.setSingleShot(true);
 
   appTimer_.start();
@@ -19,7 +16,8 @@ Client::Client(QObject *parent) : QObject(parent)
   connect(&socket_, &QTcpSocket::connected, this, &Client::OnConnected);
   connect(&socket_, &QTcpSocket::disconnected, this, &Client::OnDisconnected);
   connect(&socket_, &QTcpSocket::readyRead, this, &Client::OnReadyRead);
-  connect(&socket_, &QAbstractSocket::errorOccurred,this, &Client::OnSocketError);
+  connect(
+      &socket_, &QAbstractSocket::errorOccurred, this, &Client::OnSocketError);
   connect(&recTimer_, &QTimer::timeout, this, &Client::Reconnect);
   connect(&sendTimer_, &QTimer::timeout, this, &Client::SendDataToServer);
 }
@@ -39,7 +37,7 @@ void Client::Start(const QString &host, quint16 port)
 
 void Client::Reconnect()
 {
-  if(socket_.state() == QAbstractSocket::ConnectedState)
+  if (socket_.state() == QAbstractSocket::ConnectedState)
     return;
 
   qDebug() << QString("Connecting to %1:%2 ...").arg(host_).arg(port_);
@@ -101,18 +99,19 @@ void Client::ProcessJSON(const QJsonObject &obj)
 
   qDebug() << "Msg type:" << type;
 
-  if(type == "ConnectAck") {
+  if (type == "ConnectAck") {
     qDebug() << "ID:" << obj.value("clientId").toString();
-
-  } else if(type == "Command") {
+  }
+  else if (type == "Command") {
     auto cmd = obj.value("command").toString();
     qDebug() << cmd;
 
-    if(cmd == "start") {
+    if (cmd == "start") {
       cpuWarn_ = obj.value("cpuWarn").toInt();
       started_ = true;
       sendTimer_.start(RndInt(10, 100));
-    } else if (cmd == "stop") {
+    }
+    else if (cmd == "stop") {
       started_ = false;
       sendTimer_.stop();
     }
@@ -121,7 +120,7 @@ void Client::ProcessJSON(const QJsonObject &obj)
 
 void Client::SendJson(const QJsonObject &obj)
 {
-  if(socket_.state() != QAbstractSocket::ConnectedState)
+  if (socket_.state() != QAbstractSocket::ConnectedState)
     return;
 
   QByteArray data;
@@ -135,12 +134,15 @@ void Client::SendJson(const QJsonObject &obj)
 
 qint32 Client::RndInt(qint32 from, qint32 to) const noexcept
 {
-  return QRandomGenerator::global()->bounded(from, to);
+  auto result = QRandomGenerator::global()->bounded(from, to);
+  return result;
 }
 
 double Client::RndDouble(double from, double to) const noexcept
 {
-  return from + QRandomGenerator::global()->generateDouble() * (to - from);
+  auto result =
+      from + QRandomGenerator::global()->generateDouble() * (to - from);
+  return result;
 }
 
 void Client::SendDataToServer()
@@ -151,40 +153,42 @@ void Client::SendDataToServer()
   switch (t) {
     case 0: {
       obj["type"] = "NetworkMetrics";
-      obj["bandwidth"] = QString::number(RndDouble(1.0, 1000.0),'f',2);
-      obj["latency"] = QString::number(RndDouble(1.0, 500),'f',2);
-      obj["packet_loss"] = QString::number(RndDouble(0.0, 0.05),'f',2);
+      obj["bandwidth"] = QString::number(RndDouble(1.0, 1000.0), 'f', 2);
+      obj["latency"] = QString::number(RndDouble(1.0, 500), 'f', 2);
+      obj["packet_loss"] = QString::number(RndDouble(0.0, 0.05), 'f', 2);
       break;
     }
     case 1: {
-      auto cpuUsage =  RndInt(0, 100);
+      auto cpuUsage = RndInt(0, 100);
       obj["type"] = "DeviceStatus";
       obj["uptime"] = QString::number(appTimer_.elapsed());
       obj["cpu_usage"] = cpuUsage;
       obj["memory_usage"] = RndInt(0, 100);
 
-      if(cpuUsage > cpuWarn_)
-        SendJson(LogObject("WARN",QString("CPU usage: %1").arg(cpuUsage)));
+      if (cpuUsage > cpuWarn_)
+        SendJson(LogObject("WARN", QString("CPU usage: %1").arg(cpuUsage)));
       break;
     }
     case 2: {
       static qulonglong mc = 0;
-      obj = LogObject("INFO",QString("Random log message number %1").arg(QString::number(++mc)));
+      obj = LogObject(
+          "INFO", QString("Random log message number %1").arg(++mc));
       break;
     }
     default:;
   }
-  if(!obj.isEmpty())
+
+  if (!obj.isEmpty())
     SendJson(obj);
 
   sendTimer_.start(RndInt(10, 100));
 }
 
-QJsonObject Client::LogObject(const QString &saverity, const QString &msg)
+QJsonObject Client::LogObject(const QString &severity, const QString &msg)
 {
-  QJsonObject result;
+  auto result = QJsonObject();
   result["type"] = "Log";
   result["message"] = msg;
-  result["severity"] = saverity;
+  result["severity"] = severity;
   return result;
 }

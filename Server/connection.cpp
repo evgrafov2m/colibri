@@ -1,7 +1,9 @@
 #include "connection.h"
-#include <QTcpSocket>
+
+#include <QDataStream>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QTcpSocket>
 
 Connection::Connection(const QString &clientId, QTcpSocket *socket, QObject *parent)
     : QObject(parent), socket_(socket), cid_(clientId)
@@ -14,7 +16,7 @@ Connection::Connection(const QString &clientId, QTcpSocket *socket, QObject *par
 
 Connection::~Connection()
 {
-  if(socket_) {
+  if (socket_) {
     socket_->close();
     socket_->deleteLater();
   }
@@ -22,19 +24,19 @@ Connection::~Connection()
 
 void Connection::OnReadyRead()
 {
-  if(!socket_)
+  if (!socket_)
     return;
 
   QDataStream in(socket_);
   in.setVersion(QDataStream::Qt_6_0);
 
-  forever{
+  forever {
     in.startTransaction();
 
     QByteArray jsonData;
     in >> jsonData;
 
-    if(!in.commitTransaction())
+    if (!in.commitTransaction())
       break;
 
     QJsonParseError err;
@@ -46,7 +48,7 @@ void Connection::OnReadyRead()
       continue;
     }
 
-    if(!doc.isObject())
+    if (!doc.isObject())
       continue;
 
     emit JsonObject(doc.object());
@@ -68,7 +70,7 @@ void Connection::SendJson(const QJsonObject &obj)
 
 void Connection::OnSocketError(QAbstractSocket::SocketError)
 {
-  if(!socket_)
+  if (!socket_)
     return;
 
   emit ErrorOccurred(cid_, socket_->errorString());
@@ -76,6 +78,6 @@ void Connection::OnSocketError(QAbstractSocket::SocketError)
 
 void Connection::DisconnectSocket()
 {
-  if(socket_)
+  if (socket_)
     socket_->disconnectFromHost();
 }

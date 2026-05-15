@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QMap>
 #include <QMainWindow>
+#include <QWidget>
 
 class QHBoxLayout;
 class QPushButton;
@@ -15,13 +17,13 @@ class QThread;
 class CentralWidget : public QWidget
 {
   Q_OBJECT
+
 public:
   explicit CentralWidget(QWidget *parent = nullptr);
   void InitializeServer();
   ~CentralWidget();
 
 private:
-  // лэйаут управления
   QHBoxLayout *layControl_ = nullptr;
   QPushButton *sStart_ = nullptr;
   QPushButton *sStop_ = nullptr;
@@ -29,19 +31,17 @@ private:
   QPushButton *cStop_ = nullptr;
   QSpinBox *cpuWarn_ = nullptr;
 
-         // главный лэйаут содержащий осноынве графические компоненты
   QVBoxLayout *lay_ = nullptr;
-  QTabWidget  *tab_ = nullptr;
+  QTabWidget *tab_ = nullptr;
 
   QTableWidget *clients_ = nullptr;
   QTableWidget *messages_ = nullptr;
   QTextBrowser *log_ = nullptr;
 
-         // бизнес-логика в отдельном потоке
   ConnectionMan *worker_ = nullptr;
   QThread *workerThread_ = nullptr;
 
-  QMap<QString,int> clientRows_;
+  QMap<QString, int> clientRows_;
 
   void AddClientRow(const QString &clientId, const QString &ip, const QString &status);
   void RemoveClientRow(const QString &clientId);
@@ -63,8 +63,9 @@ private slots:
 class MainWindow : public QMainWindow
 {
   Q_OBJECT
+
 public:
-  MainWindow(QWidget * parent = nullptr) : QMainWindow(parent)
+  explicit MainWindow(QWidget *parent = nullptr) : QMainWindow(parent)
   {
     auto cw = new CentralWidget(this);
     cw->InitializeServer();

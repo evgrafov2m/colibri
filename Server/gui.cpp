@@ -1,49 +1,53 @@
 #include "gui.h"
 #include "connectionman.h"
 
-#include <QJsonObject>
-#include <QWidget>
+#include <QColor>
+#include <QDateTime>
 #include <QHBoxLayout>
-#include <QPushButton>
-#include <QTabWidget>
-#include <QTextBrowser>
-#include <QTableWidget>
-#include <QMainWindow>
-#include <QSpinBox>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
+#include <QPushButton>
+#include <QSpacerItem>
+#include <QSpinBox>
+#include <QTabWidget>
+#include <QTableWidget>
+#include <QTextBrowser>
 #include <QThread>
+#include <QVBoxLayout>
 
-static const auto DTFormt = QLatin1String("yyyy-MM-dd hh:mm:ss");
+static const auto dtFormat = QLatin1String("yyyy-MM-dd hh:mm:ss");
 
 CentralWidget::CentralWidget(QWidget *parent) : QWidget(parent)
 {
-  setMinimumSize(640,480);
+  setMinimumSize(640, 480);
   layControl_ = new QHBoxLayout();
-  sStart_ = new QPushButton("Start server",this);
-  sStop_ = new QPushButton("Stop server",this);
+  sStart_ = new QPushButton("Start server", this);
+  sStop_ = new QPushButton("Stop server", this);
   sStop_->setEnabled(false);
-  cStart_ = new QPushButton("Start clients",this);
+  cStart_ = new QPushButton("Start clients", this);
   cStart_->setEnabled(false);
-  cStop_ = new QPushButton("Stop clients",this);
+  cStop_ = new QPushButton("Stop clients", this);
   cStop_->setEnabled(false);
   cpuWarn_ = new QSpinBox(this);
-  cpuWarn_->setRange(1,100);
+  cpuWarn_->setRange(1, 100);
   cpuWarn_->setValue(50);
 
-  layControl_->addItem(new QSpacerItem(0,0,QSizePolicy::MinimumExpanding));
+  layControl_->addItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding));
   layControl_->addWidget(sStart_);
   layControl_->addWidget(sStop_);
   layControl_->addWidget(cStart_);
   layControl_->addWidget(cStop_);
-  layControl_->addWidget(new QLabel(QString("Информировать при загрузке процессора более чем"),this));
+  layControl_->addWidget(
+      new QLabel(QString("Информировать при загрузке процессора более чем"), this));
   layControl_->addWidget(cpuWarn_);
-  layControl_->addWidget(new QLabel(QString("%"),this));
+  layControl_->addWidget(new QLabel(QString("%"), this));
 
-  clients_ = new QTableWidget(0,3,this);
+  clients_ = new QTableWidget(0, 3, this);
   clients_->setHorizontalHeaderLabels(QStringList() << "ID" << "Address" << "Status");
   clients_->setSelectionBehavior(QAbstractItemView::SelectRows);
 
-  messages_ = new QTableWidget(0,5,this);
+  messages_ = new QTableWidget(0, 5, this);
   messages_->setHorizontalHeaderLabels(QStringList() << "ID" << "Type" << "Content" << "JSON" << "Received");
   messages_->setSelectionBehavior(QAbstractItemView::SelectRows);
   log_ = new QTextBrowser(this);
@@ -51,9 +55,9 @@ CentralWidget::CentralWidget(QWidget *parent) : QWidget(parent)
   lay_ = new QVBoxLayout(this);
   tab_ = new QTabWidget(this);
 
-  tab_->addTab(clients_,"Clients");
-  tab_->addTab(messages_,"Messages");
-  tab_->addTab(log_,"Log");
+  tab_->addTab(clients_, "Clients");
+  tab_->addTab(messages_, "Messages");
+  tab_->addTab(log_, "Log");
 
   lay_->addLayout(layControl_);
   lay_->addWidget(tab_);
@@ -84,7 +88,7 @@ void CentralWidget::InitializeServer()
 
 CentralWidget::~CentralWidget()
 {
-  if(worker_)
+  if (worker_)
     QMetaObject::invokeMethod(worker_, "StopServer", Qt::QueuedConnection);
 
   workerThread_->quit();
@@ -93,8 +97,9 @@ CentralWidget::~CentralWidget()
 
 void CentralWidget::OnStartServer()
 {
-  if(!worker_)
+  if (!worker_)
     return;
+
   QMetaObject::invokeMethod(worker_, "StartServer", Qt::QueuedConnection);
   sStart_->setEnabled(false);
   sStop_->setEnabled(true);
@@ -105,8 +110,9 @@ void CentralWidget::OnStartServer()
 
 void CentralWidget::OnStopServer()
 {
-  if(!worker_)
+  if (!worker_)
     return;
+
   QMetaObject::invokeMethod(worker_, "StopServer", Qt::QueuedConnection);
   sStart_->setEnabled(true);
   sStop_->setEnabled(false);
@@ -117,7 +123,7 @@ void CentralWidget::OnClientConnected(const QString &clientId, const QString &ip
 {
   auto ipport = QString("%1:%2").arg(ip).arg(port);
   AddClientRow(clientId, ipport, "Connected");
-  OnLogMessage(QString("Client connected: %1 (%2)").arg(clientId,ipport));
+  OnLogMessage(QString("Client connected: %1 (%2)").arg(clientId, ipport));
 }
 
 void CentralWidget::OnClientDisconnected(const QString &clientId)
@@ -130,26 +136,27 @@ void CentralWidget::OnDataReceived(const QString &clientId, const QJsonObject &o
 {
   auto type = obj.value("type").toString("Unknown");
   auto raw = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
-  QString parsed;
-
-  bool warn = false;
+  auto parsed = QString();
+  auto warn = false;
 
   if (type == "NetworkMetrics" || type == "DeviceStatus") {
     QStringList parts;
     for (auto it = obj.begin(); it != obj.end(); ++it) {
       if (it.key() == "type")
         continue;
+
       auto v = it.value();
-      parts << QString("%1=%2").arg(it.key(),v.toVariant().toString());
+      parts << QString("%1=%2").arg(it.key(), v.toVariant().toString());
     }
     parsed = parts.join(", ");
-  } else if (type == "Log") {
+  }
+  else if (type == "Log") {
     auto s = obj.value("severity").toString();
-    if(!QString::compare(s,"warn",Qt::CaseInsensitive))
+    if (!QString::compare(s, "warn", Qt::CaseInsensitive))
       warn = true;
+
     parsed = "[" + obj.value("severity").toString() + "] ";
     parsed.append(obj.value("message").toString());
-
   }
 
   int row = messages_->rowCount();
@@ -158,18 +165,21 @@ void CentralWidget::OnDataReceived(const QString &clientId, const QJsonObject &o
   messages_->setItem(row, 1, new QTableWidgetItem(type));
   messages_->setItem(row, 2, new QTableWidgetItem(parsed));
   messages_->setItem(row, 3, new QTableWidgetItem(raw));
-  messages_->setItem(row, 4, new QTableWidgetItem(QDateTime::currentDateTime().toString(DTFormt)));
+  messages_->setItem(
+      row, 4,
+      new QTableWidgetItem(QDateTime::currentDateTime().toString(dtFormat)));
 
-  if(warn)
-    for(int i = 0; i < 5; i++)
-      messages_->item(row,i)->setBackground(QColor(255,255,0,40));
+  if (warn)
+    for (int i = 0; i < 5; ++i)
+      messages_->item(row, i)->setBackground(QColor(255, 255, 0, 40));
 
-  OnLogMessage(QString("Data from %1: %2").arg(clientId,type));
+  OnLogMessage(QString("Data from %1: %2").arg(clientId, type));
 }
 
 void CentralWidget::OnLogMessage(const QString &msg)
 {
-  log_->append(QString("[%1] %2").arg(QDateTime::currentDateTime().toString(DTFormt), msg));
+  log_->append(
+      QString("[%1] %2").arg(QDateTime::currentDateTime().toString(dtFormat), msg));
 }
 
 void CentralWidget::AddClientRow(const QString &clientId, const QString &ip, const QString &status)
@@ -178,7 +188,8 @@ void CentralWidget::AddClientRow(const QString &clientId, const QString &ip, con
     auto r = clientRows_.value(clientId);
     clients_->setItem(r, 1, new QTableWidgetItem(ip));
     clients_->setItem(r, 2, new QTableWidgetItem(status));
-  } else {
+  }
+  else {
     auto row = clients_->rowCount();
     clients_->insertRow(row);
     clients_->setItem(row, 0, new QTableWidgetItem(clientId));
@@ -190,37 +201,44 @@ void CentralWidget::AddClientRow(const QString &clientId, const QString &ip, con
 
 void CentralWidget::RemoveClientRow(const QString &clientId)
 {
-  if(!clientRows_.contains(clientId))
+  if (!clientRows_.contains(clientId))
     return;
+
   auto row = clientRows_.take(clientId);
   clients_->removeRow(row);
 
-  QMap<QString,int> tmp;
+  QMap<QString, int> tmp;
   for (int r = 0; r < clients_->rowCount(); ++r) {
-    auto id = clients_->item(r,0)->text();
+    auto id = clients_->item(r, 0)->text();
     tmp.insert(id, r);
   }
+
   clientRows_ = tmp;
 }
 
 void CentralWidget::OnStartClientsClicked()
 {
-  if(!worker_)
+  if (!worker_)
     return;
+
   cStart_->setEnabled(false);
   cStop_->setEnabled(true);
-  QMetaObject::invokeMethod(worker_,
-                            [this]() {
-                              worker_->SetCPUwarn(cpuWarn_->value());
-                              worker_->StartClients();
-                            },Qt::QueuedConnection);
+  QMetaObject::invokeMethod(
+      worker_,
+      [this]()
+      {
+        worker_->SetCPUwarn(cpuWarn_->value());
+        worker_->StartClients();
+      },
+      Qt::QueuedConnection);
   OnLogMessage("Starting clients ...");
 }
 
 void CentralWidget::OnStopClientsClicked()
 {
-  if(!worker_)
+  if (!worker_)
     return;
+
   cStart_->setEnabled(true);
   cStop_->setEnabled(false);
   QMetaObject::invokeMethod(worker_, "StopClients", Qt::QueuedConnection);

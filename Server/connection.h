@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QAbstractSocket>
+#include <QObject>
+#include <QString>
 
 class QTcpSocket;
 class QJsonObject;
@@ -8,11 +10,12 @@ class QJsonObject;
 class Connection : public QObject
 {
   Q_OBJECT
+
 public:
   Connection(const QString &clientId, QTcpSocket *socket, QObject *parent = nullptr);
   ~Connection();
 
-  const QString& ClientId() const noexcept{ return cid_; }
+  const QString &ClientId() const noexcept { return cid_; }
   void SendJson(const QJsonObject &obj);
   void DisconnectSocket();
 
@@ -25,7 +28,7 @@ private slots:
   void OnSocketError(QAbstractSocket::SocketError);
 
 signals:
-  void JsonObject(const QJsonObject&);
+  void JsonObject(const QJsonObject &obj);
   void Disconnected();
   void ErrorOccurred(const QString &, const QString &);
 };

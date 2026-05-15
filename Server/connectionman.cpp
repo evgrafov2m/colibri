@@ -1,14 +1,14 @@
 #include "connectionman.h"
 #include "connection.h"
+
+#include <QDateTime>
+#include <QHostAddress>
+#include <QJsonObject>
 #include <QTcpServer>
 #include <QTcpSocket>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QHostAddress>
-#include <QDateTime>
 
 ConnectionMan::ConnectionMan(quint16 port, QObject *parent)
-    : QObject(parent), tcpServer_(nullptr), port_(port), nextClientId_(1)
+    : QObject(parent), port_(port), nextClientId_(1)
 {
 }
 
@@ -23,14 +23,19 @@ void ConnectionMan::StartServer()
     emit LogMessage("Server already started.");
     return;
   }
+
   tcpServer_ = new QTcpServer();
   if (!tcpServer_->listen(QHostAddress::Any, port_)) {
-    emit LogMessage(QString("Failed to start server: %1").arg(tcpServer_->errorString()));
+    emit LogMessage(
+        QString("Failed to start server: %1").arg(tcpServer_->errorString()));
     delete tcpServer_;
     tcpServer_ = nullptr;
     return;
   }
-  connect(tcpServer_, &QTcpServer::newConnection, this, &ConnectionMan::HandleNewConnection);
+
+  connect(
+      tcpServer_, &QTcpServer::newConnection, this,
+      &ConnectionMan::HandleNewConnection);
   emit LogMessage(QString("Server listening on port %1").arg(port_));
 }
 
@@ -38,9 +43,11 @@ void ConnectionMan::StopServer()
 {
   if (!tcpServer_)
     return;
+
   tcpServer_->close();
   delete tcpServer_;
   tcpServer_ = nullptr;
+
   for (auto c : std::as_const(clients_)) {
     c->DisconnectSocket();
     c->deleteLater();
@@ -51,7 +58,7 @@ void ConnectionMan::StopServer()
 
 void ConnectionMan::HandleNewConnection()
 {
-  if(!tcpServer_)
+  if (!tcpServer_)
     return;
 
   while (tcpServer_->hasPendingConnections()) {
@@ -60,11 +67,15 @@ void ConnectionMan::HandleNewConnection()
     auto conn = new Connection(cid, sock, this);
     clients_.insert(cid, conn);
 
-    connect(conn, &Connection::Disconnected, this, &ConnectionMan::HandleClientDisconnected);
+    connect(
+        conn, &Connection::Disconnected, this,
+        &ConnectionMan::HandleClientDisconnected);
     connect(conn, &Connection::JsonObject, this, &ConnectionMan::HandleClientReadyRead);
-    connect(conn, &Connection::ErrorOccurred, this, [this](const QString &id, const QString &err){
-      HandleClientError(id, err);
-    });
+    connect(conn, &Connection::ErrorOccurred, this,
+            [this](const QString &id, const QString &err)
+            {
+              HandleClientError(id, err);
+            });
 
     QJsonObject confirm;
     confirm["type"] = "ConnectAck";
@@ -76,21 +87,21 @@ void ConnectionMan::HandleNewConnection()
     auto port = sock->peerPort();
 
     emit ClientConnected(cid, ip, port);
-    emit LogMessage(QString("New connection %1 from %2:%3").arg(cid,ip,port));
+    emit LogMessage(QString("New connection %1 from %2:%3").arg(cid, ip).arg(port));
   }
 }
 
 void ConnectionMan::HandleClientReadyRead(const QJsonObject &obj)
 {
-  auto conn = qobject_cast<Connection*>(sender());
-  if(conn)
+  auto conn = qobject_cast<Connection *>(sender());
+  if (conn)
     emit DataReceived(conn->ClientId(), obj);
 }
 
 void ConnectionMan::HandleClientDisconnected()
 {
-  auto conn = qobject_cast<Connection*>(sender());
-  if(conn){
+  auto conn = qobject_cast<Connection *>(sender());
+  if (conn) {
     auto id = conn->ClientId();
     clients_.remove(id);
     emit ClientDisconnected(id);
@@ -101,7 +112,7 @@ void ConnectionMan::HandleClientDisconnected()
 
 void ConnectionMan::HandleClientError(const QString &clientId, const QString &errmsg)
 {
-  emit LogMessage(QString("Client %1 error: %2").arg(clientId,errmsg));
+  emit LogMessage(QString("Client %1 error: %2").arg(clientId, errmsg));
 }
 
 void ConnectionMan::StartClients()
@@ -111,7 +122,7 @@ void ConnectionMan::StartClients()
   cmd["command"] = "start";
   cmd["cpuWarn"] = cpuWarn_;
 
-  for(auto it = clients_.begin(); it != clients_.end(); ++it)
+  for (auto it = clients_.begin(); it != clients_.end(); ++it)
     it.value()->SendJson(cmd);
 }
 
@@ -120,6 +131,7 @@ void ConnectionMan::StopClients()
   QJsonObject cmd;
   cmd["type"] = "Command";
   cmd["command"] = "stop";
-  for(auto it = clients_.begin(); it != clients_.end(); ++it)
+
+  for (auto it = clients_.begin(); it != clients_.end(); ++it)
     it.value()->SendJson(cmd);
 }
